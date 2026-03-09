@@ -82,7 +82,7 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    private void OnRoundWinnerDecided(int winnerIndex, float errorMs)
+    public void OnRoundWinnerDecided(int winnerIndex, float errorMs)
     {
         CurrentState = GameState.Moving;
         Debug.Log($"[라운드 결과] Player {winnerIndex} 승! 배가 이동합니다.");
