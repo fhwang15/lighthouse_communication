@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
+using TMPro;
 
 /// <summary>
 /// [A 플레이어용] 스페이스바 입력을 녹화하는 시스템
@@ -28,6 +29,10 @@ public class NoteRecorder : MonoBehaviour
     // 외부에서 읽을 수 있도록 (NotePlayer가 사용)
     public List<float> RecordedTimestamps => noteTimestamps;
 
+
+    public TextMeshProUGUI numberText;
+
+
     // ───────────────────────────────────────────
     // 공개 메서드
     // ───────────────────────────────────────────
@@ -37,7 +42,8 @@ public class NoteRecorder : MonoBehaviour
     {
         // 초기화
         noteTimestamps.Clear();
-        targetNoteCount = Random.Range(minNotes, maxNotes + 1); // 3,4,5 중 하나
+        targetNoteCount = Random.Range(minNotes, maxNotes + 1);
+        numberText.text = targetNoteCount.ToString();
         isRecording = true;
         recordingStartTime = Time.time;
 
@@ -86,7 +92,6 @@ public class NoteRecorder : MonoBehaviour
     {
         if (noteTimestamps.Count == 0)
         {
-            Debug.LogWarning("[녹화 실패] 노트가 없어!");
             return;
         }
 

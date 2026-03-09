@@ -19,7 +19,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private NoteRecorder recorder;
     [SerializeField] private NotePlayer notePlayer;
     [SerializeField] private JudgeManager judgeManager;
-    [SerializeField] private AccuracyJudge[] judges; // B, C, D (3개)
+    [SerializeField] private AccuracyJudge[] judges;
 
     [Header("배 이동 설정")]
     [SerializeField] private Transform shipTransform;       // 배 오브젝트
