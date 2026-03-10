@@ -3,14 +3,6 @@ using UnityEngine;
 using UnityEngine.Events;
 using TMPro;
 
-/// <summary>
-/// [A 플레이어용] 스페이스바 입력을 녹화하는 시스템
-/// 
-/// 사용법:
-/// 1. 빈 GameObject에 이 스크립트를 붙여
-/// 2. Inspector에서 minNotes=3, maxNotes=5 확인
-/// 3. OnRecordingComplete 이벤트에 NotePlayer.PlayNotes() 연결
-/// </summary>
 public class NoteRecorder : MonoBehaviour
 {
     [Header("노트 개수 설정")]
@@ -18,30 +10,29 @@ public class NoteRecorder : MonoBehaviour
     [SerializeField] private int maxNotes = 5;
 
     [Header("이벤트")]
-    public UnityEvent<List<float>> OnRecordingComplete; // 녹화 완료 시 호출
+    public UnityEvent<List<float>> OnRecordingComplete;
 
-    // 내부 상태
-    private List<float> noteTimestamps = new List<float>(); // 각 노트를 누른 시각(초)
-    private int targetNoteCount;   // 이번 라운드에 받을 노트 수 (3~5 랜덤)
+    [SerializeField] private GameObject FlashObject;
+
+    private List<float> noteTimestamps = new List<float>();
+    private int targetNoteCount; 
     private bool isRecording = false;
     private float recordingStartTime;
 
-    // 외부에서 읽을 수 있도록 (NotePlayer가 사용)
+    public NotePlayer npText;
+
     public List<float> RecordedTimestamps => noteTimestamps;
 
 
     public TextMeshProUGUI numberText;
 
 
-    // ───────────────────────────────────────────
-    // 공개 메서드
-    // ───────────────────────────────────────────
-
-    /// <summary>녹화를 시작해. GameManager에서 호출.</summary>
     public void StartRecording()
     {
         // 초기화
         noteTimestamps.Clear();
+        npText.phaseText.text = "Signal Recording on process...";
+
         targetNoteCount = Random.Range(minNotes, maxNotes + 1);
         numberText.text = targetNoteCount.ToString();
         isRecording = true;
@@ -50,7 +41,6 @@ public class NoteRecorder : MonoBehaviour
         Debug.Log($"[녹화 시작] 목표 노트 수: {targetNoteCount}개");
     }
 
-    /// <summary>강제로 녹화 중단 (타임아웃 등에 사용)</summary>
     public void StopRecording()
     {
         if (!isRecording) return;
@@ -58,29 +48,28 @@ public class NoteRecorder : MonoBehaviour
         FinishRecording();
     }
 
-    // ───────────────────────────────────────────
-    // 내부 로직
-    // ───────────────────────────────────────────
-
     private void Update()
     {
         if (!isRecording) return;
 
         if (Input.GetKeyDown(KeyCode.Space))
         {
+            FlashObject.SetActive(true);
             RegisterNote();
+        }
+        else if (Input.GetKeyUp(KeyCode.Space))
+        {
+            FlashObject.SetActive(false);
         }
     }
 
     private void RegisterNote()
     {
-        // 녹화 시작 시각으로부터 경과한 시간을 저장
         float elapsed = Time.time - recordingStartTime;
         noteTimestamps.Add(elapsed);
 
         Debug.Log($"[노트 {noteTimestamps.Count}/{targetNoteCount}] {elapsed:F3}초");
 
-        // 목표 노트 수에 도달하면 자동 완료
         if (noteTimestamps.Count >= targetNoteCount)
         {
             isRecording = false;
@@ -92,6 +81,7 @@ public class NoteRecorder : MonoBehaviour
     {
         if (noteTimestamps.Count == 0)
         {
+            npText.phaseText.text = "Finished Recording";
             return;
         }
 
