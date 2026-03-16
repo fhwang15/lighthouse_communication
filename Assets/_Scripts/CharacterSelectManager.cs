@@ -167,6 +167,10 @@ public class CharacterSelectManager : MonoBehaviour
 
         GameManager.Instance.gameStarted = true;
 
+
+        // ← 이거 추가!
+        FindObjectOfType<PartyCameraController>()?.TransitionToGame();
+
         // ① 역할 랜덤 배정 (Ship/Lighthouse 위치 + 역할 결정)
         if (RoleManager.Instance != null)
             RoleManager.Instance.AssignRoles();

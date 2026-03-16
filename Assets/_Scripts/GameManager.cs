@@ -91,7 +91,18 @@ public class GameManager : MonoBehaviour
     // 컨트롤러 플레이어 추가
     private void AddGamepadPlayer(Gamepad pad)
     {
+
+        Debug.Log($"디바이스 정보: name={pad.name} | interface={pad.description.interfaceName} | manufacturer={pad.description.manufacturer} | deviceClass={pad.description.deviceClass}");
+
+
         if (players.Count >= maxPlayers) return;
+
+
+        if (pad.description.interfaceName == "Virtual")
+        {
+            Debug.Log($"[GameManager] 가상 디바이스 스킵: {pad.name}");
+            return;
+        }
 
         PlayerSlot newPlayer = new PlayerSlot(pad);
         players.Add(newPlayer);
