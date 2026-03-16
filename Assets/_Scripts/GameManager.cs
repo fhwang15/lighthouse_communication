@@ -1,124 +1,128 @@
-using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Events;
+using UnityEngine.InputSystem;
 
-namespace GameCore
+// Central authority for player detection and session management
+public class GameManager : MonoBehaviour
 {
-    public class GameManager : MonoBehaviour
+    public static GameManager Instance;
+
+    [Header("References")]
+    [SerializeField] private CharacterSelectManager characterSelectManager;
+
+    [Header("Settings")]
+    public int maxPlayers = 4;
+    public bool gameStarted = false;
+    public bool debugDisplay = false;
+
+    [Header("Debug / Test")]
+    public bool testMode = false;
+
+    public List<PlayerSlot> players = new List<PlayerSlot>();
+
+    // ≈∞∫∏µÂ «√∑π¿ÃæÓ∞° ¿ÃπÃ ¡∂¿Œ«ﬂ¥¬¡ˆ √º≈©
+    private bool keyboardPlayerJoined = false;
+
+    private void Awake()
     {
-        [Header("ÌïµÏã¨ ÏãúÏä§ÌÖú Ïó∞Í≤∞")]
-        [SerializeField] private NoteRecorder recorder;
-        [SerializeField] private NotePlayer notePlayer;
-        [SerializeField] private JudgeManager judgeManager;
-        [SerializeField] private AccuracyJudge[] judges;
-
-        [Header("Î∞∞ Ïù¥Îèô ÏÑ§Ï†ï")]
-        [SerializeField] private Transform shipTransform;       
-        [SerializeField] private Transform[] lighthousePositions; 
-        [SerializeField] private float shipMoveSpeed = 2.0f;    
-        
-        [Header("Ïö∞Ïäπ Í±∞Î¶¨ ÏÑ§Ï†ï")]
-        [SerializeField] private float winDistance;
-
-        [Header("Ïù¥Î≤§Ìä∏")]
-        public UnityEvent<int> OnGameOver;
-
-        public enum GameState { Idle, ARecording, Playing, BCD_Mimicking, Judging, Moving }
-        public GameState CurrentState { get; private set; } = GameState.Idle;
-
-        private void Start()
+        if (Instance == null)
+            Instance = this;
+        else
         {
+            Destroy(gameObject);
+            return;
+        }
+    }
 
-            recorder.OnRecordingComplete.AddListener(notePlayer.PlayNotes);
-            notePlayer.OnPlaybackComplete.AddListener(StartMimicPhase);
-            judgeManager.OnWinnerDecided.AddListener(OnRoundWinnerDecided);
-
-            StartCoroutine(StartRound());
+    private void Start()
+    {
+        if (characterSelectManager == null)
+        {
+            Debug.LogError("CharacterSelectManager is not assigned.");
+            return;
         }
 
-        private IEnumerator StartRound()
+        DetectExistingGamepads();
+    }
+
+    private void Update()
+    {
+        PollForNewControllers();
+
+        // Enter ≈∞∑Œ ≈∞∫∏µÂ «√∑π¿ÃæÓ ¡∂¿Œ
+        if (testMode && !keyboardPlayerJoined && !gameStarted && players.Count < maxPlayers)
         {
-            Debug.Log("====== ÏÉà ÎùºÏö¥Îìú ÏãúÏûë ======");
-            judgeManager.ResetForNewRound();
-
-            yield return new WaitForSeconds(1.0f);
-
-            CurrentState = GameState.ARecording;
-            Debug.Log("Ship: press space to do record the notes");
-            recorder.StartRecording();
-
-        }
-
-        private void StartMimicPhase()
-        {
-            CurrentState = GameState.BCD_Mimicking;
-            Debug.Log("mimic rn");
-
-            foreach (var judge in judges)
+            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
             {
-                judge.StartListening();
+                AddKeyboardPlayer();
             }
         }
 
-        public void OnRoundWinnerDecided(int winnerIndex, float errorMs)
+        if (debugDisplay && players.Count > 0)
+            DebugControllerState(players[0]);
+    }
+
+    private void DetectExistingGamepads()
+    {
+        foreach (var pad in Gamepad.all)
+            AddGamepadPlayer(pad);
+    }
+
+    private void PollForNewControllers()
+    {
+        foreach (var pad in Gamepad.all)
         {
-            CurrentState = GameState.Moving;
+            bool alreadyAdded = false;
 
-            StartCoroutine(MoveShipToWinner(winnerIndex));
-        }
-
-        private IEnumerator MoveShipToWinner(int winnerIndex)
-        {
-            if (shipTransform == null || lighthousePositions == null
-                || winnerIndex >= lighthousePositions.Length)
+            foreach (var player in players)
             {
-                StartCoroutine(StartRound());
-                yield break;
-            }
-
-            Vector3 targetPos = lighthousePositions[winnerIndex].position;
-
-            while (Vector3.Distance(shipTransform.position, targetPos) > shipMoveSpeed * Time.deltaTime)
-            {
-                shipTransform.position = Vector3.MoveTowards(
-                    shipTransform.position,
-                    targetPos,
-                    shipMoveSpeed * Time.deltaTime
-                );
-                yield return null;
-
-                if (Vector3.Distance(shipTransform.position, targetPos) <= shipMoveSpeed * 0.5f)
+                if (player.gamepad != null && player.gamepad == pad)
                 {
+                    alreadyAdded = true;
                     break;
                 }
             }
 
-            Debug.Log("[Ïù¥Îèô ÏôÑÎ£å]");
-
-            // Ïö∞Ïäπ Ï≤¥ÌÅ¨
-            if (CheckWinCondition(out int winnerLighthouse))
-            {
-                OnGameOver?.Invoke(winnerLighthouse);
-            }
-
-            StartCoroutine(StartRound());
+            if (!alreadyAdded)
+                AddGamepadPlayer(pad);
         }
+    }
 
-        private bool CheckWinCondition(out int winnerIndex)
-        {
-            winnerIndex = -1;
+    // ƒ¡∆Æ∑—∑Ø «√∑π¿ÃæÓ √ﬂ∞°
+    private void AddGamepadPlayer(Gamepad pad)
+    {
+        if (players.Count >= maxPlayers) return;
 
-            if (shipTransform == null || lighthousePositions == null) return false;
+        PlayerSlot newPlayer = new PlayerSlot(pad);
+        players.Add(newPlayer);
 
-            for (int i = 0; i < lighthousePositions.Length; i++)
-            {
-                if (Vector3.Distance(shipTransform.position, lighthousePositions[i].position) <= winDistance)
-                {
-                    winnerIndex = i;
-                    return true;
-                }
-            }
-            return false;
-        }
+        Debug.Log($"[GameManager] ƒ¡∆Æ∑—∑Ø «√∑π¿ÃæÓ √ﬂ∞°! ({pad.name}) √— {players.Count}∏Ì");
+        characterSelectManager.SpawnPlayerLobbyVisuals(players.Count - 1);
+    }
+
+    // ≈∞∫∏µÂ «√∑π¿ÃæÓ √ﬂ∞° (gamepad = null)
+    private void AddKeyboardPlayer()
+    {
+        if (players.Count >= maxPlayers) return;
+
+        // gamepad æ¯¿Ã PlayerSlot ª˝º∫ (null ¿¸¥ﬁ)
+        PlayerSlot newPlayer = new PlayerSlot(null);
+        players.Add(newPlayer);
+        keyboardPlayerJoined = true;
+
+        Debug.Log($"[GameManager] ≈∞∫∏µÂ «√∑π¿ÃæÓ √ﬂ∞°! √— {players.Count}∏Ì");
+        characterSelectManager.SpawnPlayerLobbyVisuals(players.Count - 1);
+    }
+
+    private void DebugControllerState(PlayerSlot player)
+    {
+        if (player == null || player.gamepad == null) return;
+
+        Gamepad pad = player.gamepad;
+        string state = "Gamepad State\n";
+        state += "A: " + pad.buttonSouth.isPressed + "\n";
+        state += "B: " + pad.buttonEast.isPressed + "\n";
+        state += "Start: " + pad.startButton.isPressed + "\n";
+        Debug.Log(state);
     }
 }
