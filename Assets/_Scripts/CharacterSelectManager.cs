@@ -1,5 +1,7 @@
 using UnityEngine;
+using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 
 public class CharacterSelectManager : MonoBehaviour
 {
@@ -11,6 +13,10 @@ public class CharacterSelectManager : MonoBehaviour
 
     [Header("Rhythm Game")]
     [SerializeField] private RhythmGameManager rhythmGameManager;
+
+    [Header("카운트다운")]
+    [SerializeField] private TextMeshProUGUI countdownText;
+    [SerializeField] private float countdownSeconds = 10f;
 
     private void Update()
     {
@@ -30,14 +36,12 @@ public class CharacterSelectManager : MonoBehaviour
         PlayerSlot player = GameManager.Instance.players[index];
         if (player == null) return;
 
-        // 키보드 플레이어
         if (player.gamepad == null)
         {
             HandleKeyboardInput(index, player);
             return;
         }
 
-        // 컨트롤러 플레이어
         if (player.isLocked) return;
 
         if (player.gamepad.dpad.left.wasPressedThisFrame)
@@ -60,7 +64,6 @@ public class CharacterSelectManager : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.RightArrow))
             CycleCharacter(index, 1);
 
-        // Space로 Ready
         if (Input.GetKeyDown(KeyCode.Space))
             LockPlayer(index);
     }
@@ -150,7 +153,6 @@ public class CharacterSelectManager : MonoBehaviour
     {
         var players = GameManager.Instance.players;
 
-        // 최소 2명 이상이어야 게임 시작
         if (players.Count < 2) return;
 
         foreach (var player in players)
@@ -158,26 +160,59 @@ public class CharacterSelectManager : MonoBehaviour
             if (!player.isLocked) return;
         }
 
+        // 전원 Ready → 카운트다운 시작!
+        StartCoroutine(CountdownCoroutine());
+    }
+
+    private IEnumerator CountdownCoroutine()
+    {
+
+        GameManager.Instance.movementEnabled = true;
+
+
+        if (countdownText != null)
+            countdownText.gameObject.SetActive(true);
+
+        float remaining = countdownSeconds;
+
+        while (remaining > 0f)
+        {
+            // 숫자 표시 (소수점 없이)
+            if (countdownText != null)
+                countdownText.text = Mathf.CeilToInt(remaining).ToString();
+
+            remaining -= Time.deltaTime;
+            yield return null;
+        }
+
+        // 0! 표시 후 잠깐 대기
+        if (countdownText != null)
+            countdownText.text = "GO!";
+
+        yield return new WaitForSeconds(0.5f);
+
+        // 카운트다운 텍스트 숨기기
+        if (countdownText != null)
+            countdownText.gameObject.SetActive(false);
+
         StartGame();
     }
 
     private void StartGame()
     {
-        Debug.Log("All players locked → 게임 시작!");
-
         GameManager.Instance.gameStarted = true;
+        GameManager.Instance.movementEnabled = false;
 
-
-        // ← 이거 추가!
-        FindObjectOfType<PartyCameraController>()?.TransitionToGame();
-
-        // ① 역할 랜덤 배정 (Ship/Lighthouse 위치 + 역할 결정)
+        // 역할 랜덤 배정
         if (RoleManager.Instance != null)
             RoleManager.Instance.AssignRoles();
         else
-            Debug.LogError("RoleManager 없음! 씬에 추가해줘.");
+            Debug.LogError("RoleManager 없음!");
 
-        // ② 리듬 게임 시작
+        // 카메라 전환
+        FindObjectOfType<PartyCameraController>()?.TransitionToGame();
+
+        // 리듬 게임 시작
         if (rhythmGameManager != null)
             rhythmGameManager.StartGame();
         else

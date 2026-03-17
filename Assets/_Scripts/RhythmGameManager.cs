@@ -109,10 +109,7 @@ public class RhythmGameManager : MonoBehaviour
         StartCoroutine(MoveShipStep(winnerJudgeIndex));
     }
 
-    // ───────────────────────────────────────────
-    // 배 이동 (매 라운드 10%씩)
-    // ───────────────────────────────────────────
-
+    //Ship moving
     private IEnumerator MoveShipStep(int lighthouseIndex)
     {
         if (shipTransform == null || lighthousePositions == null

@@ -9,10 +9,8 @@ public class BillboardYOnly : MonoBehaviour
         if (cam == null)
             cam = Camera.main.transform;
 
-        Vector3 lookPos = cam.position - transform.position;
-        lookPos.y = 0f;
-
-        if (lookPos.sqrMagnitude > 0.001f)
-            transform.rotation = Quaternion.LookRotation(-lookPos);
+        // 모든 축으로 카메라를 향함 (위에서 내려다봐도 잘 보임)
+        transform.LookAt(transform.position + cam.rotation * Vector3.forward,
+                         cam.rotation * Vector3.up);
     }
 }

@@ -46,7 +46,7 @@ public class PlayerCharacterController : MonoBehaviour
         if (playerSlot == null || playerSlot.gamepad == null)
             return;
 
-        if (!GameManager.Instance.gameStarted)
+        if (!GameManager.Instance.movementEnabled)
         {
             animator.SetBool("IsGameplay", false);
             return;
@@ -108,9 +108,9 @@ public class PlayerCharacterController : MonoBehaviour
     private void HandleActions()
     {
         var pad = playerSlot.gamepad;
+        if (pad == null) return;
 
-        if (pad == null)
-            return;
+        if (!GameManager.Instance.movementEnabled) return;
 
         if (pad.buttonSouth.wasPressedThisFrame && !isJumping)
         {

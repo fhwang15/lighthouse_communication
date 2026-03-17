@@ -1,21 +1,19 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// 게임 시작 시 플레이어들에게 Ship/Lighthouse 역할을 랜덤 배정
-/// 
-/// 사용법:
-/// 1. 빈 GameObject에 이 스크립트 붙여
-/// 2. Inspector에서 shipPosition, lighthousePositions 연결
-/// 3. CharacterSelectManager.StartGame() 에서 AssignRoles() 호출
-/// </summary>
+
+// 게임 시작 시 플레이어들에게 Ship/Lighthouse 역할을 랜덤 배정
+// 사용법:
+// 1. 빈 GameObject에 이 스크립트 붙여
+// 2. Inspector에서 shipPosition, lighthousePositions 연결
+// 3. CharacterSelectManager.StartGame() 에서 AssignRoles() 호출
 public class RoleManager : MonoBehaviour
 {
     public static RoleManager Instance;
 
     [Header("위치 연결")]
-    [SerializeField] private Transform shipPosition;           // Ship 스폰 위치
-    [SerializeField] private Transform[] lighthousePositions;  // Lighthouse 스폰 위치 [0~2]
+    [SerializeField] private Transform shipPosition;           
+    [SerializeField] private Transform[] lighthousePositions;  
 
     // 역할 결과 (외부에서 읽기용)
     public int ShipPlayerIndex { get; private set; } = -1;          // Ship 담당 플레이어 인덱스
@@ -29,14 +27,6 @@ public class RoleManager : MonoBehaviour
             Destroy(gameObject);
     }
 
-    // ───────────────────────────────────────────
-    // 공개 메서드
-    // ───────────────────────────────────────────
-
-    /// <summary>
-    /// CharacterSelectManager.StartGame() 에서 호출.
-    /// 역할 랜덤 배정 + 캐릭터 위치 이동
-    /// </summary>
     public void AssignRoles()
     {
         var players = GameManager.Instance.players;
@@ -72,10 +62,6 @@ public class RoleManager : MonoBehaviour
                 Debug.LogWarning($"[RoleManager] Lighthouse 위치 {i}번이 없어! Inspector에서 추가해줘.");
         }
     }
-
-    // ───────────────────────────────────────────
-    // 내부 로직
-    // ───────────────────────────────────────────
 
     private void MoveToPosition(int playerIndex, Transform targetPos, string roleName)
     {

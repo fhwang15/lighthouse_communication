@@ -53,6 +53,12 @@ public class AccuracyJudge : MonoBehaviour
 
     public void StartListening()
     {
+
+        if (matRenderer != null && originalMaterial != null)
+        {
+            matRenderer.material.color = originalMaterial.color;
+        }
+
         if (notePlayer == null || notePlayer.CurrentNoteTimestamps == null)
         {
             Debug.LogError($"[Judge {playerIndex}] NotePlayer 연결 안 됨!");

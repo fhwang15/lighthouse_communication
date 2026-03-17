@@ -18,6 +18,9 @@ public class GameManager : MonoBehaviour
     [Header("Debug / Test")]
     public bool testMode = false;
 
+    public bool movementEnabled = false;
+
+
     public List<PlayerSlot> players = new List<PlayerSlot>();
 
     // 키보드 플레이어가 이미 조인했는지 체크
