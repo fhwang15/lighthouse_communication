@@ -7,7 +7,7 @@ using UnityEngine.InputSystem;
 public class AccuracyJudge : MonoBehaviour
 {
     [Header("Player Settings")]
-    public int playerIndex; // 0=B, 1=C, 2=D
+    public int playerIndex;
 
     [Header("Connection")]
     [SerializeField] private NotePlayer notePlayer;
@@ -20,14 +20,10 @@ public class AccuracyJudge : MonoBehaviour
     public Renderer matRenderer;
     public Material flickeringMaterial;
 
-    // ── 테스트 모드 ──────────────────────────────
     [Header("Test Mode")]
-    [Tooltip("켜면 키보드 사용 / 끄면 gamepad 사용")]
+    [Tooltip("켜면 키보드 / 끄면 gamepad")]
     public bool testMode = true;
-
-    [Tooltip("testMode=true 일 때 사용할 키 (B=Z, C=X, D=C)")]
     public KeyCode testKey = KeyCode.Z;
-    // ────────────────────────────────────────────
 
     public float AverageErrorMs { get; private set; } = float.MaxValue;
     public bool IsFinished { get; private set; } = false;
@@ -35,10 +31,12 @@ public class AccuracyJudge : MonoBehaviour
     public UnityEvent<int, float> OnJudgeDone;
 
     private PlayerSlot assignedSlot;
-    private List<float> myTimestamps = new List<float>();
+
+    // press 타이밍만 기록 (판정용)
+    private List<float> myPressTimestamps = new List<float>();
     private bool isListening = false;
     private float listenStartTime;
-    private List<float> referenceTimestamps;
+    private List<NoteData> referenceNotes;
 
     private void Start()
     {
@@ -53,38 +51,35 @@ public class AccuracyJudge : MonoBehaviour
 
     public void StartListening()
     {
-
-        if (matRenderer != null && originalMaterial != null)
+        if (notePlayer == null || notePlayer.CurrentNotes == null || notePlayer.CurrentNotes.Count == 0)
         {
-            matRenderer.material.color = originalMaterial.color;
-        }
-
-        if (notePlayer == null || notePlayer.CurrentNoteTimestamps == null)
-        {
-            Debug.LogError($"[Judge {playerIndex}] NotePlayer 연결 안 됨!");
+            Debug.LogError($"[Judge {playerIndex}] NotePlayer 연결 안 됨 또는 노트 없음!");
             return;
         }
 
-        // testMode=false 일 때만 gamepad 체크
         if (!testMode && (assignedSlot == null || assignedSlot.gamepad == null))
         {
-            Debug.LogError($"[Judge {playerIndex}] Gamepad 없음! testMode를 켜거나 컨트롤러 연결해.");
+            Debug.LogError($"[Judge {playerIndex}] Gamepad 없음!");
             return;
         }
 
-        myTimestamps.Clear();
+        // 색 리셋
+        if (matRenderer != null && originalMaterial != null)
+            matRenderer.material.color = originalMaterial.color;
+
+        myPressTimestamps.Clear();
         IsFinished = false;
         AverageErrorMs = float.MaxValue;
-        referenceTimestamps = notePlayer.CurrentNoteTimestamps;
+        referenceNotes = notePlayer.CurrentNotes;
 
         isListening = true;
         listenStartTime = Time.time;
 
-        float deadline = referenceTimestamps[referenceTimestamps.Count - 1] + listenWindowExtra;
-        StartCoroutine(AutoFinishCoroutine(deadline));
+        // 마지막 노트 release 시간 + 여유 시간 후 자동 마감
+        float lastRelease = referenceNotes[referenceNotes.Count - 1].releaseTime;
+        StartCoroutine(AutoFinishCoroutine(lastRelease + listenWindowExtra));
 
-        string inputInfo = testMode ? $"키보드 {testKey}" : $"Gamepad {assignedSlot.gamepad.name}";
-        Debug.Log($"[Judge {playerIndex}] 모방 시작! 입력: {inputInfo}");
+        Debug.Log($"[Judge {playerIndex}] 모방 시작!");
     }
 
     public void StopListening()
@@ -102,13 +97,11 @@ public class AccuracyJudge : MonoBehaviour
 
         if (testMode)
         {
-            // 키보드 입력
             pressed = Input.GetKeyDown(testKey);
             released = Input.GetKeyUp(testKey);
         }
         else
         {
-            // 컨트롤러 입력
             if (assignedSlot?.gamepad == null) return;
             pressed = assignedSlot.gamepad.buttonSouth.wasPressedThisFrame;
             released = assignedSlot.gamepad.buttonSouth.wasReleasedThisFrame;
@@ -120,14 +113,16 @@ public class AccuracyJudge : MonoBehaviour
 
     private void OnButtonPressed()
     {
+        // 시각 피드백
         if (matRenderer != null && flickeringMaterial != null)
             matRenderer.material.color = flickeringMaterial.color;
 
         float elapsed = Time.time - listenStartTime;
-        myTimestamps.Add(elapsed);
-        Debug.Log($"[Judge {playerIndex}] 입력! {elapsed:F3}초 ({myTimestamps.Count}/{referenceTimestamps.Count})");
+        myPressTimestamps.Add(elapsed);
 
-        if (myTimestamps.Count >= referenceTimestamps.Count)
+        Debug.Log($"[Judge {playerIndex}] Press! t={elapsed:F3}s ({myPressTimestamps.Count}/{referenceNotes.Count})");
+
+        if (myPressTimestamps.Count >= referenceNotes.Count)
         {
             isListening = false;
             StopAllCoroutines();
@@ -137,6 +132,7 @@ public class AccuracyJudge : MonoBehaviour
 
     private void OnButtonReleased()
     {
+        // Long press 끝 → 원래 색으로
         if (matRenderer != null && originalMaterial != null)
             matRenderer.material.color = originalMaterial.color;
     }
@@ -157,8 +153,8 @@ public class AccuracyJudge : MonoBehaviour
     {
         IsFinished = true;
 
-        int refCount = referenceTimestamps.Count;
-        int myCount = myTimestamps.Count;
+        int refCount = referenceNotes.Count;
+        int myCount = myPressTimestamps.Count;
 
         if (myCount == 0)
         {
@@ -168,17 +164,18 @@ public class AccuracyJudge : MonoBehaviour
             return;
         }
 
+        // press 타이밍 오차만 계산
         float totalError = 0f;
         for (int i = 0; i < refCount; i++)
         {
             if (i < myCount)
             {
-                float diffMs = Mathf.Abs(referenceTimestamps[i] - myTimestamps[i]) * 1000f;
+                float diffMs = Mathf.Abs(referenceNotes[i].pressTime - myPressTimestamps[i]) * 1000f;
                 totalError += diffMs;
             }
             else
             {
-                totalError += 1000f;
+                totalError += 1000f; // 패널티
             }
         }
 
