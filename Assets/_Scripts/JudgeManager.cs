@@ -8,18 +8,23 @@ public class JudgeManager : MonoBehaviour
     public UnityEvent<int, float> OnWinnerDecided;
 
     private Dictionary<int, float> results = new Dictionary<int, float>();
-    private int expectedResults = 3; // RhythmGameManager가 매 라운드 세팅해줌
+    private int expectedResults = 3;
 
     public void ResetForNewRound()
     {
         results.Clear();
     }
 
-    /// <summary>이번 라운드에 참여하는 Lighthouse 수 세팅. RhythmGameManager가 호출.</summary>
     public void SetExpectedResults(int count)
     {
         expectedResults = count;
         Debug.Log($"[JudgeManager] 이번 라운드 판정 인원: {expectedResults}명");
+    }
+
+    /// <summary>ScoreManager가 점수 계산할 때 사용</summary>
+    public Dictionary<int, float> GetLastResults()
+    {
+        return new Dictionary<int, float>(results);
     }
 
     public void ReceiveResult(int playerIndex, float averageErrorMs)
