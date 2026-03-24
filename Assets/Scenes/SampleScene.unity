@@ -283,7 +283,7 @@ MonoBehaviour:
   originalMaterial: {fileID: 2100000, guid: f312566f477b52a42b6ddce02aff1b8d, type: 2}
   matRenderer: {fileID: 896966609}
   flickeringMaterial: {fileID: 2100000, guid: c9e73976b780e9c46b1e027a7175dfee, type: 2}
-  testMode: 0
+  testMode: 1
   testKey: 122
   OnJudgeDone:
     m_PersistentCalls:
@@ -801,8 +801,8 @@ MonoBehaviour:
   - {fileID: 54193456}
   - {fileID: 1314292447}
   shipMoveSpeed: 3
-  shipRotateSpeed: 3
-  moveStepRatio: 0.1
+  shipRotateSpeed: -90
+  moveStepRatio: 0.3
   winDistance: 1
   OnGameOver:
     m_PersistentCalls:
@@ -2348,7 +2348,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameManager
   characterSelectManager: {fileID: 1518961605}
-  maxPlayers: 2
+  maxPlayers: 4
   gameStarted: 0
   debugDisplay: 0
   testMode: 1

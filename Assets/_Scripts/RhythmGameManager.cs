@@ -178,8 +178,10 @@ public class RhythmGameManager : MonoBehaviour
 
         // 배 방향을 목표 등대 쪽으로
         Vector3 directionToTarget = (targetPos - shipTransform.position).normalized;
-        directionToTarget.y = 0f;
-        Quaternion targetRotation = Quaternion.LookRotation(directionToTarget);
+        directionToTarget.y = 0f; // Y축 고정 (top down)
+
+        // 배 앞방향이 Z축이면 그대로, X축이면 두 번째 인자 변경
+        Quaternion targetRotation = Quaternion.LookRotation(directionToTarget, Vector3.up) * Quaternion.Euler(0, -90f, 0);
 
         while (Vector3.Distance(shipTransform.position, stepDestination) > 0.01f)
         {
@@ -189,10 +191,10 @@ public class RhythmGameManager : MonoBehaviour
                 shipMoveSpeed * Time.deltaTime
             );
 
-            shipTransform.rotation = Quaternion.Slerp(
-                shipTransform.rotation,
-                targetRotation,
-                shipRotateSpeed * Time.deltaTime
+            shipTransform.rotation = Quaternion.RotateTowards(
+            shipTransform.rotation,
+            targetRotation,
+            shipRotateSpeed * Time.deltaTime
             );
 
             yield return null;
