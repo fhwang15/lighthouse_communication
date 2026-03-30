@@ -15,13 +15,14 @@ public class RhythmGameManager : MonoBehaviour
     [SerializeField] private Transform shipTransform;
     [SerializeField] private Transform[] lighthousePositions;
     [SerializeField] private float shipMoveSpeed = 3.0f;
-    [SerializeField] private float shipRotateSpeed = 3.0f;
+    [SerializeField] private float shipRotateSpeed = 90f;
 
-    [Header("라운드당 이동 비율 (0.1 = 10%)")]
-    [SerializeField] private float moveStepRatio = 0.1f;
+    [Header("라운드당 이동 거리 (고정값)")]
+    [Tooltip("매 라운드 이동하는 고정 거리 (비율 아님!)")]
+    [SerializeField] private float moveStepDistance = 1.0f;
 
     [Header("우승 거리")]
-    [SerializeField] private float winDistance = 1.0f;
+    [SerializeField] private float winDistance = 1.5f;
 
     [Header("이벤트")]
     public UnityEvent<int> OnGameOver;
@@ -59,8 +60,11 @@ public class RhythmGameManager : MonoBehaviour
         Debug.Log("====== 새 라운드 시작 ======");
         judgeManager.ResetForNewRound();
 
-        // ── Recording Phase 카운트다운 ──
-        // "3, 2, 1, RECORD!" 표시 후 녹화 시작
+        // 악보 UI 초기화
+        RhythmScoreUI.Instance?.ResetBoard();
+
+        yield return new WaitForSeconds(1.0f);
+
         if (PhaseUIManager.Instance != null)
             yield return StartCoroutine(PhaseUIManager.Instance.ShowPhase("RECORD!"));
 
@@ -68,18 +72,13 @@ public class RhythmGameManager : MonoBehaviour
         recorder.StartRecording();
     }
 
-    private void OnRecordingCompleted(List<NoteData> notes)
+    private void OnRecordingCompleted(List<float> notes)
     {
         if (notes.Count == 0)
         {
-            Debug.Log("[RhythmGameManager] 배 타임아웃!");
             ScoreManager.Instance?.OnShipTimeout();
             StartCoroutine(TimeoutSequence());
         }
-        // 정상 완료 시 → PlayNotes 이벤트가 자동으로 NotePlayer.PlayNotes 호출
-        // → PlaybackCoroutine 시작 → OnPlaybackComplete → StartMimicPhase
-        // 단, Playing Phase 카운트다운은 NotePlayer가 내부적으로 prePlayDelay로 처리 중
-        // → 여기서 추가로 표시하고 싶으면 아래 주석 해제
         else
         {
             StartCoroutine(ShowPlayingPhaseUI());
@@ -88,15 +87,10 @@ public class RhythmGameManager : MonoBehaviour
 
     private IEnumerator ShowPlayingPhaseUI()
     {
-        // ── Playing Phase 카운트다운 ──
-        // "3, 2, 1, WATCH!" 표시
         if (PhaseUIManager.Instance != null)
             yield return StartCoroutine(PhaseUIManager.Instance.ShowPhase("WATCH!"));
 
         CurrentState = GameState.Playing;
-        // NotePlayer는 이미 PlayNotes 실행 중 (prePlayDelay로 대기 중)
-        // → PhaseUIManager 카운트다운 시간(3초)이 NotePlayer의 prePlayDelay와 맞아야 함!
-        // NotePlayer.prePlayDelay = PhaseUIManager.countdownInterval * 3 + messageHoldTime
     }
 
     private IEnumerator TimeoutSequence()
@@ -110,7 +104,7 @@ public class RhythmGameManager : MonoBehaviour
 
     private void StartMimicPhase()
     {
-        if (notePlayer.CurrentNotes == null || notePlayer.CurrentNotes.Count == 0)
+        if (notePlayer.CurrentNoteTimestamps == null || notePlayer.CurrentNoteTimestamps.Count == 0)
             return;
 
         StartCoroutine(StartMimicPhaseCoroutine());
@@ -118,18 +112,12 @@ public class RhythmGameManager : MonoBehaviour
 
     private IEnumerator StartMimicPhaseCoroutine()
     {
-        // ── Mimic Phase 카운트다운 ──
-        // "3, 2, 1, COPY!" 표시
         if (PhaseUIManager.Instance != null)
             yield return StartCoroutine(PhaseUIManager.Instance.ShowPhase("COPY!"));
 
         CurrentState = GameState.BCD_Mimicking;
 
-        if (RoleManager.Instance == null)
-        {
-            Debug.LogError("[RhythmGameManager] RoleManager 없음!");
-            yield break;
-        }
+        if (RoleManager.Instance == null) { Debug.LogError("[RhythmGameManager] RoleManager 없음!"); yield break; }
 
         var lighthousePlayers = RoleManager.Instance.LighthousePlayerIndices;
 
@@ -156,12 +144,11 @@ public class RhythmGameManager : MonoBehaviour
     }
 
     // ───────────────────────────────────────────
-    // 배 이동 + 방향 전환
+    // 배 이동 - 고정 거리로 이동 (버그 수정!)
     // ───────────────────────────────────────────
 
     private IEnumerator MoveShipStep(int lighthouseIndex)
     {
-        // ── Moving Phase 메시지 ──
         if (PhaseUIManager.Instance != null)
             yield return StartCoroutine(PhaseUIManager.Instance.ShowMessage("MOVING! 🚢", 1.0f));
 
@@ -173,16 +160,32 @@ public class RhythmGameManager : MonoBehaviour
         }
 
         Vector3 targetPos = lighthousePositions[lighthouseIndex].position;
-        Vector3 startPos = shipTransform.position;
-        Vector3 stepDestination = Vector3.Lerp(startPos, targetPos, moveStepRatio);
 
-        // 배 방향을 목표 등대 쪽으로
-        Vector3 directionToTarget = (targetPos - shipTransform.position).normalized;
-        directionToTarget.y = 0f; // Y축 고정 (top down)
+        // ── 핵심 수정 ──────────────────────────────
+        // 비율(%) 대신 고정 거리(moveStepDistance)만큼 이동
+        // → 언젠가는 반드시 winDistance 이내로 들어옴!
+        Vector3 direction = (targetPos - shipTransform.position).normalized;
+        float currentDist = Vector3.Distance(shipTransform.position, targetPos);
 
-        // 배 앞방향이 Z축이면 그대로, X축이면 두 번째 인자 변경
-        Quaternion targetRotation = Quaternion.LookRotation(directionToTarget, Vector3.up) * Quaternion.Euler(0, -90f, 0);
+        // 이미 등대 안에 있으면 바로 우승 체크
+        if (currentDist <= winDistance)
+        {
+            HandleWin(lighthouseIndex);
+            yield break;
+        }
 
+        // 이동 목적지: 현재 위치에서 방향으로 moveStepDistance만큼
+        // 단, 등대를 넘어가지 않도록 clamp
+        float actualStep = Mathf.Min(moveStepDistance, currentDist - winDistance + 0.1f);
+        Vector3 stepDestination = shipTransform.position + direction * actualStep;
+
+        // 배 방향 회전
+        Vector3 dir = direction;
+        dir.y = 0f;
+        Quaternion targetRotation = Quaternion.LookRotation(dir, Vector3.up)
+            * Quaternion.Euler(0, -90f, 0); // X축 보정
+
+        // 이동 + 회전
         while (Vector3.Distance(shipTransform.position, stepDestination) > 0.01f)
         {
             shipTransform.position = Vector3.MoveTowards(
@@ -192,46 +195,43 @@ public class RhythmGameManager : MonoBehaviour
             );
 
             shipTransform.rotation = Quaternion.RotateTowards(
-            shipTransform.rotation,
-            targetRotation,
-            shipRotateSpeed * Time.deltaTime
+                shipTransform.rotation,
+                targetRotation,
+                shipRotateSpeed * Time.deltaTime
             );
 
             yield return null;
         }
 
         shipTransform.position = stepDestination;
-        Debug.Log("[이동 완료]");
+        Debug.Log($"[이동 완료] 등대까지 남은 거리: {Vector3.Distance(shipTransform.position, targetPos):F2}");
 
-        if (CheckWinCondition(out int winnerLighthouse))
+        // 우승 체크
+        if (Vector3.Distance(shipTransform.position, targetPos) <= winDistance)
         {
-            ScoreManager.Instance?.OnGameEnd(winnerLighthouse);
-
-            int winnerPlayerIndex = RoleManager.Instance.LighthousePlayerIndices[winnerLighthouse];
-
-            if (PhaseUIManager.Instance != null)
-                yield return StartCoroutine(PhaseUIManager.Instance.ShowMessage($"🎉 Player {winnerPlayerIndex + 1} WINS!", 3.0f));
-
-            OnGameOver?.Invoke(winnerPlayerIndex);
+            HandleWin(lighthouseIndex);
             yield break;
         }
 
         StartCoroutine(StartRound());
     }
 
-    private bool CheckWinCondition(out int winnerIndex)
+    private void HandleWin(int lighthouseIndex)
     {
-        winnerIndex = -1;
-        if (shipTransform == null || lighthousePositions == null) return false;
+        ScoreManager.Instance?.OnGameEnd(lighthouseIndex);
 
-        for (int i = 0; i < lighthousePositions.Length; i++)
-        {
-            if (Vector3.Distance(shipTransform.position, lighthousePositions[i].position) <= winDistance)
-            {
-                winnerIndex = i;
-                return true;
-            }
-        }
-        return false;
+        int winnerPlayerIndex = RoleManager.Instance.LighthousePlayerIndices[lighthouseIndex];
+        Debug.Log($"게임 오버! Player {winnerPlayerIndex + 1} 우승!");
+
+        StartCoroutine(WinSequence(winnerPlayerIndex));
+    }
+
+    private IEnumerator WinSequence(int winnerPlayerIndex)
+    {
+        if (PhaseUIManager.Instance != null)
+            yield return StartCoroutine(
+                PhaseUIManager.Instance.ShowMessage($"🎉 Player {winnerPlayerIndex + 1} WINS!", 3.0f));
+
+        OnGameOver?.Invoke(winnerPlayerIndex);
     }
 }

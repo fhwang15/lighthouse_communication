@@ -4,16 +4,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
-/// <summary>
-/// 대기 씬 전담 매니저
-/// 
-/// 흐름:
-/// 1. 컨트롤러/키보드 연결 → 플레이어 조인
-/// 2. 좌/우로 닉네임 선택
-/// 3. A버튼(또는 Space)으로 Ready
-/// 4. 전원 Ready → Player 1이 A버튼으로 게임 시작
-/// 5. 5초 카운트다운 후 게임 씬 로드
-/// </summary>
+
 public class LobbyManager : MonoBehaviour
 {
     public static LobbyManager Instance;
@@ -50,10 +41,11 @@ public class LobbyManager : MonoBehaviour
         else Destroy(gameObject);
     }
 
-    private void Start()
+    private IEnumerator Start()
     {
         sessionData?.Clear();
-        DetectExistingGamepads();
+
+        yield return null;
     }
 
     private void Update()
@@ -108,6 +100,7 @@ public class LobbyManager : MonoBehaviour
     private void AddGamepadPlayer(Gamepad pad)
     {
         if (lobbyPlayers.Count >= maxPlayers) return;
+
 
         var slot = new LobbyPlayerSlot
         {

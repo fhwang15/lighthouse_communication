@@ -7,7 +7,7 @@ using UnityEngine.InputSystem;
 public class AccuracyJudge : MonoBehaviour
 {
     [Header("Player Settings")]
-    public int playerIndex;
+    public int playerIndex; // 0=B, 1=C, 2=D
 
     [Header("Connection")]
     [SerializeField] private NotePlayer notePlayer;
@@ -21,7 +21,6 @@ public class AccuracyJudge : MonoBehaviour
     public Material flickeringMaterial;
 
     [Header("Test Mode")]
-    [Tooltip("켜면 키보드 / 끄면 gamepad")]
     public bool testMode = true;
     public KeyCode testKey = KeyCode.Z;
 
@@ -31,12 +30,10 @@ public class AccuracyJudge : MonoBehaviour
     public UnityEvent<int, float> OnJudgeDone;
 
     private PlayerSlot assignedSlot;
-
-    // press 타이밍만 기록 (판정용)
-    private List<float> myPressTimestamps = new List<float>();
+    private List<float> myTimestamps = new List<float>();
     private bool isListening = false;
     private float listenStartTime;
-    private List<NoteData> referenceNotes;
+    private List<float> referenceTimestamps;
 
     private void Start()
     {
@@ -44,14 +41,11 @@ public class AccuracyJudge : MonoBehaviour
             matRenderer.material.color = originalMaterial.color;
     }
 
-    public void SetPlayerSlot(PlayerSlot slot)
-    {
-        assignedSlot = slot;
-    }
+    public void SetPlayerSlot(PlayerSlot slot) => assignedSlot = slot;
 
     public void StartListening()
     {
-        if (notePlayer == null || notePlayer.CurrentNotes == null || notePlayer.CurrentNotes.Count == 0)
+        if (notePlayer == null || notePlayer.CurrentNoteTimestamps == null || notePlayer.CurrentNoteTimestamps.Count == 0)
         {
             Debug.LogError($"[Judge {playerIndex}] NotePlayer 연결 안 됨 또는 노트 없음!");
             return;
@@ -67,17 +61,16 @@ public class AccuracyJudge : MonoBehaviour
         if (matRenderer != null && originalMaterial != null)
             matRenderer.material.color = originalMaterial.color;
 
-        myPressTimestamps.Clear();
+        myTimestamps.Clear();
         IsFinished = false;
         AverageErrorMs = float.MaxValue;
-        referenceNotes = notePlayer.CurrentNotes;
+        referenceTimestamps = notePlayer.CurrentNoteTimestamps;
 
         isListening = true;
         listenStartTime = Time.time;
 
-        // 마지막 노트 release 시간 + 여유 시간 후 자동 마감
-        float lastRelease = referenceNotes[referenceNotes.Count - 1].releaseTime;
-        StartCoroutine(AutoFinishCoroutine(lastRelease + listenWindowExtra));
+        float deadline = referenceTimestamps[referenceTimestamps.Count - 1] + listenWindowExtra;
+        StartCoroutine(AutoFinishCoroutine(deadline));
 
         Debug.Log($"[Judge {playerIndex}] 모방 시작!");
     }
@@ -92,20 +85,13 @@ public class AccuracyJudge : MonoBehaviour
     {
         if (!isListening) return;
 
-        bool pressed = false;
-        bool released = false;
+        bool pressed = testMode
+            ? Input.GetKeyDown(testKey)
+            : assignedSlot?.gamepad?.buttonSouth.wasPressedThisFrame ?? false;
 
-        if (testMode)
-        {
-            pressed = Input.GetKeyDown(testKey);
-            released = Input.GetKeyUp(testKey);
-        }
-        else
-        {
-            if (assignedSlot?.gamepad == null) return;
-            pressed = assignedSlot.gamepad.buttonSouth.wasPressedThisFrame;
-            released = assignedSlot.gamepad.buttonSouth.wasReleasedThisFrame;
-        }
+        bool released = testMode
+            ? Input.GetKeyUp(testKey)
+            : assignedSlot?.gamepad?.buttonSouth.wasReleasedThisFrame ?? false;
 
         if (pressed) OnButtonPressed();
         if (released) OnButtonReleased();
@@ -113,16 +99,18 @@ public class AccuracyJudge : MonoBehaviour
 
     private void OnButtonPressed()
     {
-        // 시각 피드백
         if (matRenderer != null && flickeringMaterial != null)
             matRenderer.material.color = flickeringMaterial.color;
 
         float elapsed = Time.time - listenStartTime;
-        myPressTimestamps.Add(elapsed);
+        myTimestamps.Add(elapsed);
 
-        Debug.Log($"[Judge {playerIndex}] Press! t={elapsed:F3}s ({myPressTimestamps.Count}/{referenceNotes.Count})");
+        // 악보 UI에 노트 표시
+        RhythmScoreUI.Instance?.AddLighthouseNote(playerIndex, elapsed);
 
-        if (myPressTimestamps.Count >= referenceNotes.Count)
+        Debug.Log($"[Judge {playerIndex}] Press! t={elapsed:F3}s ({myTimestamps.Count}/{referenceTimestamps.Count})");
+
+        if (myTimestamps.Count >= referenceTimestamps.Count)
         {
             isListening = false;
             StopAllCoroutines();
@@ -132,7 +120,6 @@ public class AccuracyJudge : MonoBehaviour
 
     private void OnButtonReleased()
     {
-        // Long press 끝 → 원래 색으로
         if (matRenderer != null && originalMaterial != null)
             matRenderer.material.color = originalMaterial.color;
     }
@@ -140,7 +127,6 @@ public class AccuracyJudge : MonoBehaviour
     private IEnumerator AutoFinishCoroutine(float deadline)
     {
         yield return new WaitForSeconds(deadline);
-
         if (isListening)
         {
             isListening = false;
@@ -153,30 +139,22 @@ public class AccuracyJudge : MonoBehaviour
     {
         IsFinished = true;
 
-        int refCount = referenceNotes.Count;
-        int myCount = myPressTimestamps.Count;
+        int refCount = referenceTimestamps.Count;
+        int myCount = myTimestamps.Count;
 
         if (myCount == 0)
         {
             AverageErrorMs = float.MaxValue;
-            Debug.Log($"[Judge {playerIndex}] 입력 없음");
             OnJudgeDone?.Invoke(playerIndex, AverageErrorMs);
             return;
         }
 
-        // press 타이밍 오차만 계산
         float totalError = 0f;
         for (int i = 0; i < refCount; i++)
         {
-            if (i < myCount)
-            {
-                float diffMs = Mathf.Abs(referenceNotes[i].pressTime - myPressTimestamps[i]) * 1000f;
-                totalError += diffMs;
-            }
-            else
-            {
-                totalError += 1000f; // 패널티
-            }
+            totalError += i < myCount
+                ? Mathf.Abs(referenceTimestamps[i] - myTimestamps[i]) * 1000f
+                : 1000f;
         }
 
         AverageErrorMs = totalError / refCount;

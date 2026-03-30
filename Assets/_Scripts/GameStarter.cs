@@ -1,16 +1,13 @@
 using System.Collections;
 using UnityEngine;
-using TMPro;
 
 /// <summary>
-/// GameScene 시작 시 자동으로 게임을 트리거하는 스크립트
-/// CharacterSelectManager를 완전히 대체
-/// 
-/// 역할:
-/// 1. GameManager 플레이어 등록 완료 확인
-/// 2. RoleManager로 역할 배정
-/// 3. 카메라 전환
-/// 4. RhythmGameManager 시작
+/// GameScene 시작 트리거
+/// 1. GameManager 플레이어 등록 확인
+/// 2. RoleManager 역할 배정
+/// 3. PlayerLabelManager 닉네임/점수 라벨 세팅
+/// 4. 카메라 전환
+/// 5. RhythmGameManager 시작
 /// </summary>
 public class GameStarter : MonoBehaviour
 {
@@ -19,9 +16,6 @@ public class GameStarter : MonoBehaviour
 
     [Header("Game UI")]
     [SerializeField] private GameObject gameUI;
-
-    [Header("페이즈 UI")]
-    [SerializeField] private TextMeshProUGUI phaseText;
 
     private IEnumerator Start()
     {
@@ -47,11 +41,14 @@ public class GameStarter : MonoBehaviour
         // Game UI 켜기
         if (gameUI != null) gameUI.SetActive(true);
 
-        // 역할 랜덤 배정 (Ship/Lighthouse)
+        // 역할 랜덤 배정
         if (RoleManager.Instance != null)
             RoleManager.Instance.AssignRoles();
         else
             Debug.LogError("[GameStarter] RoleManager 없음!");
+
+        // 닉네임/점수 라벨 세팅 (역할 배정 후에 해야 함!)
+        PlayerLabelManager.Instance?.SetupLabels();
 
         // 카메라 전환
         FindObjectOfType<PartyCameraController>()?.TransitionToGame();
