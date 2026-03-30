@@ -60,7 +60,10 @@ public class NotePlayer : MonoBehaviour
         }
 
         // 악보 UI 재생 라인 초기화
-        RhythmScoreUI.Instance?.PreparePlayback();
+        float duration = timestamps.Count > 0
+    ? timestamps[timestamps.Count - 1] + 0.5f
+    : 5f;
+        RhythmScoreUI.Instance?.PreparePlayback(duration);
 
         float startTime = Time.time;
 

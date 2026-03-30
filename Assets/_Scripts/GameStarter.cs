@@ -1,14 +1,6 @@
 using System.Collections;
 using UnityEngine;
 
-/// <summary>
-/// GameScene 시작 트리거
-/// 1. GameManager 플레이어 등록 확인
-/// 2. RoleManager 역할 배정
-/// 3. PlayerLabelManager 닉네임/점수 라벨 세팅
-/// 4. 카메라 전환
-/// 5. RhythmGameManager 시작
-/// </summary>
 public class GameStarter : MonoBehaviour
 {
     [Header("연결")]

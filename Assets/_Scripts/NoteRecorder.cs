@@ -127,8 +127,11 @@ public class NoteRecorder : MonoBehaviour
         StartCoroutine(FlashOff());
 
         // 첫 버튼 누른 순간 = t=0
-        if (firstPressTime < 0f) firstPressTime = Time.time;
-
+        if (firstPressTime < 0f)
+        {
+            firstPressTime = Time.time;
+            RhythmScoreUI.Instance?.StartRecordingPhase(recordingTimeLimit);
+        }
         float elapsed = Time.time - firstPressTime;
         noteTimestamps.Add(elapsed);
 

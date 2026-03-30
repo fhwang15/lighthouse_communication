@@ -121,6 +121,8 @@ public class RhythmGameManager : MonoBehaviour
 
         var lighthousePlayers = RoleManager.Instance.LighthousePlayerIndices;
 
+        RhythmScoreUI.Instance?.StartMimicPhase(recorder.recordingTimeLimit);
+
         for (int i = 0; i < judges.Length; i++)
         {
             if (i >= lighthousePlayers.Count) continue;
