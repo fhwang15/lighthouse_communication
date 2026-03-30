@@ -2,29 +2,23 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-// Central authority for player detection and session management
+/// <summary>
+/// GameScene 전용 GameManager
+/// LobbyScene에서 PlayerSessionData를 받아서 플레이어 등록
+/// 로비/캐릭터 선택 관련 코드 없음
+/// </summary>
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance;
 
-    [Header("References")]
-    [SerializeField] private CharacterSelectManager characterSelectManager;
+    [Header("SessionData (LobbyScene에서 넘어온 데이터)")]
+    [SerializeField] private PlayerSessionData sessionData;
 
     [Header("Settings")]
-    public int maxPlayers = 4;
     public bool gameStarted = false;
-    public bool debugDisplay = false;
-
-    [Header("Debug / Test")]
-    public bool testMode = false;
-
     public bool movementEnabled = false;
 
-
     public List<PlayerSlot> players = new List<PlayerSlot>();
-
-    // 키보드 플레이어가 이미 조인했는지 체크
-    private bool keyboardPlayerJoined = false;
 
     private void Awake()
     {
@@ -39,104 +33,46 @@ public class GameManager : MonoBehaviour
 
     private void Start()
     {
-        if (characterSelectManager == null)
+        SetupPlayers();
+    }
+
+    // ───────────────────────────────────────────
+    // 플레이어 등록
+    // ───────────────────────────────────────────
+
+    private void SetupPlayers()
+    {
+        if (sessionData == null || sessionData.PlayerCount == 0)
         {
-            Debug.LogError("CharacterSelectManager is not assigned.");
+            Debug.LogError("[GameManager] PlayerSessionData 없음! LobbyScene을 먼저 거쳐야 해.");
             return;
         }
 
-        DetectExistingGamepads();
-    }
+        var gamepads = new List<Gamepad>(Gamepad.all);
+        int gamepadIndex = 0;
 
-    private void Update()
-    {
-        PollForNewControllers();
-
-        // Enter 키로 키보드 플레이어 조인
-        if (testMode && !keyboardPlayerJoined && !gameStarted && players.Count < maxPlayers)
+        foreach (var entry in sessionData.players)
         {
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            PlayerSlot slot;
+
+            if (entry.isKeyboard)
             {
-                AddKeyboardPlayer();
+                slot = new PlayerSlot(null);
             }
-        }
-
-        if (debugDisplay && players.Count > 0)
-            DebugControllerState(players[0]);
-    }
-
-    private void DetectExistingGamepads()
-    {
-        foreach (var pad in Gamepad.all)
-            AddGamepadPlayer(pad);
-    }
-
-    private void PollForNewControllers()
-    {
-        foreach (var pad in Gamepad.all)
-        {
-            bool alreadyAdded = false;
-
-            foreach (var player in players)
+            else
             {
-                if (player.gamepad != null && player.gamepad == pad)
-                {
-                    alreadyAdded = true;
-                    break;
-                }
+                Gamepad pad = gamepadIndex < gamepads.Count ? gamepads[gamepadIndex] : null;
+                gamepadIndex++;
+                slot = new PlayerSlot(pad);
+
+                if (pad == null)
+                    Debug.LogWarning($"[GameManager] Player {entry.playerIndex + 1} 컨트롤러 없음!");
             }
 
-            if (!alreadyAdded)
-                AddGamepadPlayer(pad);
-        }
-    }
-
-    // 컨트롤러 플레이어 추가
-    private void AddGamepadPlayer(Gamepad pad)
-    {
-
-        Debug.Log($"디바이스 정보: name={pad.name} | interface={pad.description.interfaceName} | manufacturer={pad.description.manufacturer} | deviceClass={pad.description.deviceClass}");
-
-
-        if (players.Count >= maxPlayers) return;
-
-
-        if (pad.description.interfaceName == "Virtual")
-        {
-            Debug.Log($"[GameManager] 가상 디바이스 스킵: {pad.name}");
-            return;
+            players.Add(slot);
+            Debug.Log($"[GameManager] Player {entry.playerIndex + 1} ({entry.nickname}) 등록");
         }
 
-        PlayerSlot newPlayer = new PlayerSlot(pad);
-        players.Add(newPlayer);
-
-        Debug.Log($"[GameManager] 컨트롤러 플레이어 추가! ({pad.name}) 총 {players.Count}명");
-        characterSelectManager.SpawnPlayerLobbyVisuals(players.Count - 1);
-    }
-
-    // 키보드 플레이어 추가 (gamepad = null)
-    private void AddKeyboardPlayer()
-    {
-        if (players.Count >= maxPlayers) return;
-
-        // gamepad 없이 PlayerSlot 생성 (null 전달)
-        PlayerSlot newPlayer = new PlayerSlot(null);
-        players.Add(newPlayer);
-        keyboardPlayerJoined = true;
-
-        Debug.Log($"[GameManager] 키보드 플레이어 추가! 총 {players.Count}명");
-        characterSelectManager.SpawnPlayerLobbyVisuals(players.Count - 1);
-    }
-
-    private void DebugControllerState(PlayerSlot player)
-    {
-        if (player == null || player.gamepad == null) return;
-
-        Gamepad pad = player.gamepad;
-        string state = "Gamepad State\n";
-        state += "A: " + pad.buttonSouth.isPressed + "\n";
-        state += "B: " + pad.buttonEast.isPressed + "\n";
-        state += "Start: " + pad.startButton.isPressed + "\n";
-        Debug.Log(state);
+        Debug.Log($"[GameManager] 총 {players.Count}명 등록 완료");
     }
 }

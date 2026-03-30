@@ -13,8 +13,6 @@ public class PlayerSlot
     // Whether this player has locked in their choice
     public bool isLocked;
 
-    // Lobby visual controller
-    public PlayerCharacterController playerCharacterController;
 
     // Runtime avatar used in gameplay scenes
     public GameObject currentAvatar;
@@ -24,7 +22,6 @@ public class PlayerSlot
         gamepad = pad;
         selectedIndex = 0;
         isLocked = false;
-        playerCharacterController = null;
         currentAvatar = null;
     }
 }
