@@ -1521,10 +1521,10 @@ MonoBehaviour:
   - {fileID: 1336633496}
   - {fileID: 54193456}
   - {fileID: 1314292447}
-  shipMoveSpeed: 3
+  shipMoveSpeed: 5
   shipRotateSpeed: -90
-  moveStepDistance: 1
-  winDistance: 1
+  moveStepDistance: 2
+  winDistance: 10
   OnGameOver:
     m_PersistentCalls:
       m_Calls: []
